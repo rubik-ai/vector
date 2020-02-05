@@ -34,13 +34,31 @@ tag="$1"
 image="timberiodev/vector-$tag:latest"
 
 #
-# Execute
+# (Re)Build
 #
 
-$DOCKER build \
-  -t $image \
-  -f scripts/ci-docker-images/$tag/Dockerfile \
-  .
+dockerfile=scripts/ci-docker-images/$tag/Dockerfile
+rebuild() {
+  $DOCKER build --file $dockerfile --tag $image .
+}
+
+# Rebuild the image if it doesn't exist or is older than the Dockerfile
+build_date=$( $DOCKER inspect $image 2>/dev/null | fgrep '"Created":' | cut -d'"' -f4 )
+if [ -z "$build_date" ]
+then
+  rebuild
+else
+  build_date=$( date +%s --date="$build_date" )
+  docker_date=$( stat --format=%Y $dockerfile )
+  if [ $docker_date -ge $build_date ]
+  then
+    rebuild
+  fi
+fi
+
+#
+# Execute
+#
 
 # Set flags for "docker run".
 # The `--rm` flag is used to delete containers on exit.
